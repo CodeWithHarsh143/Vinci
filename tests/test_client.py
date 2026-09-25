@@ -10,7 +10,7 @@ import asyncio
 
 @pytest.fixture
 def service():
-    return LLMClient(api_key="test")
+    return LLMClient()
 
 
 @pytest.mark.asyncio
@@ -34,32 +34,31 @@ async def test_generate_success(service, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_generate_provider_error(service, monkeypatch):
-    create = AsyncMock(side_effect=Exception("API failed"))
-    monkeypatch.setattr(
-        client.chat.completions,
-        "create",
-        create,
-    )
-    service._friendly_error = Mock(return_value="Provider unavailable")
-    result = await service.generate("Hello")
-    assert result == (
-        "⚠️ I couldn't generate an answer right now.\n\nProvider unavailable"
-    )
-    service._friendly_error.assert_called_once()
+async def test_generate_api_failed(service, monkeypatch):
+    service.generate = AsyncMock(side_effect=RuntimeError("LLM generation failed"))
+
+    with pytest.raises(RuntimeError, match="LLM generation failed"):
+        await service.generate("Hello")
+
+
+@pytest.mark.asyncio
+async def test_generate__cancelled_error(service):
+    service.generate = AsyncMock(side_effect=asyncio.CancelledError())
+    with pytest.raises(asyncio.CancelledError):
+        await service.generate("Call")
 
 
 @pytest.mark.asyncio
 async def test_generate_structured_success(service):
     service.generate = AsyncMock(
-        return_value='{"plan":["test1","test2"],"dependencies":[[],["test"]],"estimated_time_minutes":45}'
+        return_value='{"plan":["test1","test2"],"dependencies":[[],["test"]],"estimated_time_minutes":35}'
     )
     result = await service.generate_structured("Call", PlanModel)
 
     assert isinstance(result, PlanModel)
     assert result.plan == ["test1", "test2"]
     assert result.dependencies == [[], ["test"]]
-    assert result.estimated_time_minutes == 45
+    assert result.estimated_time_minutes == 35
     service.generate.assert_awaited_once_with("Call")
 
 
@@ -85,18 +84,18 @@ async def test_generate_structured_invalid_json(service):
     service.generate = AsyncMock(return_value="Invalid JSON")
     with pytest.raises(ValueError, match="Invalid JSON"):
         await service.generate_structured("Call", PlanModel)
-    assert service.generate.await_count == 4
+    assert service.generate.await_count == 3
 
 
 @pytest.mark.asyncio
-async def test_generate_structured_invlaid_structure(service):
+async def test_generate_structured_invalid_structure(service):
     service.generate = AsyncMock(
         return_value='{"Plan":[],"dependencies":[],"estimated_time_minutes":"2"}'
     )
 
     with pytest.raises(ValueError, match="Invalid Structure from the LLM"):
         await service.generate_structured("Call", PlanModel)
-    assert service.generate.await_count == 4
+    assert service.generate.await_count == 3
 
 
 @pytest.mark.asyncio
@@ -114,3 +113,18 @@ async def test_generate_structured_invlaid_structure_then_success(service):
     assert result.dependencies == []
     assert result.estimated_time_minutes == 2
     assert service.generate.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_generate_structured_api_failed(service):
+    service.generate = AsyncMock(side_effect=RuntimeError("LLM generation failed"))
+
+    with pytest.raises(RuntimeError, match="LLM generation failed"):
+        await service.generate_structured("Call", PlanModel)
+
+
+@pytest.mark.asyncio
+async def test_generate_structured_cancelled_error(service):
+    service.generate = AsyncMock(side_effect=asyncio.CancelledError())
+    with pytest.raises(asyncio.CancelledError):
+        await service.generate_structured("Call", PlanModel)

@@ -11,23 +11,8 @@ client = AsyncOpenAI(
 
 
 class LLMClient:
-    def __init__(self, api_key: str, model: str = "gemini-pro") -> None:
-        self.api_key = api_key
+    def __init__(self, model: str = "gemini-pro") -> None:
         self.model = model
-
-    def _friendly_error(self, exc: Exception) -> str:
-
-        if isinstance(exc, APIStatusError):
-            status = exc.status_code
-            if status == 503:
-                return (
-                    "The AI model is currently experiencing high demand. "
-                    "Please try again in a moment."
-                )
-            return f"The AI service returned an error ({status}). Please try again."
-        if isinstance(exc, TimeoutError):
-            return "The AI service timed out. Please try again."
-        return "An unexpected error occurred while generating the answer."
 
     async def generate(self, prompt: str) -> str:
 
@@ -40,34 +25,32 @@ class LLMClient:
             return full_answer
 
         except asyncio.CancelledError:
-            # Client disconnected (stop button / navigation). The DB session is being
-            # torn down at this point, so don't attempt any writes — just stop
-            # generation and let the cancellation propagate cleanly. The partial
-            # answer is already visible in the client UI.
             raise
         except Exception as exc:
-            # Surface an upstream/provider or streaming failure as a readable token
-            # instead of crashing the whole streamed response. The user message was
-            # already persisted above, so record a short fallback answer too.
-            message = self._friendly_error(exc)
-            full_answer = f"⚠️ I couldn't generate an answer right now.\n\n{message}"
-            return full_answer
+            raise RuntimeError("LLM generation failed") from exc
 
     async def generate_structured(
         self, propmt: str, schema: type[BaseModel]
     ) -> BaseModel:
         retry: int = 3
         validated = None
-        while retry >= 0:
+        while retry > 0:
             try:
                 data: str = await self.generate(propmt)
                 structure_response = json.loads(data)
                 validated = schema.model_validate(structure_response)
+
+            except RuntimeError:
+                if retry == 1:
+                    raise
+
+            except asyncio.CancelledError:
+                raise
             except json.JSONDecodeError as e:
-                if retry == 0:
+                if retry == 1:
                     raise ValueError("Invalid JSON") from e
             except ValidationError as e:
-                if retry == 0:
+                if retry == 1:
                     raise ValueError("Invalid Structure from the LLM") from e
             else:
                 break
