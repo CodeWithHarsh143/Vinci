@@ -25,7 +25,7 @@ async def test_not_allowed_file(tmp_path):
 
     result = await read_file.execute({"path": "../../../tmp/some-file.txt"})
 
-    assert result.success is False
+    assert result.success == False
     assert result.error == "Path outside allowed root"
 
 
