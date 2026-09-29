@@ -33,7 +33,7 @@ class SearchCodeTool(BaseTool):
             proc = await asyncio.create_subprocess_exec(
                 "rg",
                 args.query,
-                args.path,
+                str(resolved),
                 "--vimgrep",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
