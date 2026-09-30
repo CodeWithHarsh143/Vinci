@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from openai import APIError, AsyncOpenAI
 from pydantic import BaseModel, ValidationError
 import asyncio
@@ -10,6 +12,19 @@ client = AsyncOpenAI(
     api_key=settings.gemini_api_key,
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
 )
+
+
+@dataclass
+class ToolCallRequest:
+    id: int
+    name: str
+    arguments: dict
+
+
+@dataclass
+class CallResponse:
+    content: str
+    tool_calls: list[ToolCallRequest]
 
 
 class LLMClient:
@@ -56,3 +71,39 @@ class LLMClient:
                     raise ValueError(
                         "LLM response does not match the expected structure"
                     ) from e
+
+    async def chat(
+        self, messages: list[dict], tools: list[dict] | dict | None = None
+    ) -> CallResponse:
+        if isinstance(tools, dict):
+            tools = list(tools.values())
+        if not tools:
+            tools = None
+
+        try:
+            kwargs: dict = {"model": self.model, "messages": messages}
+            if tools is not None:
+                kwargs["tools"] = tools
+            response = await client.chat.completions.create(**kwargs)
+            message = response.choices[0].message
+
+            tool_calls: list[ToolCallRequest] = []
+            for tc in message.tool_calls or []:
+                try:
+                    arguments = json.loads(tc.function.arguments)
+                except json.JSONDecodeError as e:
+                    raise ValueError(
+                        f"LLM returned invalid tool arguments for '{tc.function.name}'"
+                    ) from e
+                tool_calls.append(
+                    ToolCallRequest(
+                        id=tc.id, name=tc.function.name, arguments=arguments
+                    )
+                )
+
+            return CallResponse(content=message.content, tool_calls=tool_calls)
+
+        except asyncio.CancelledError:
+            raise
+        except (APIError, ConnectionError, TimeoutError) as exc:
+            raise LLMAPIError(f"API call failed: {exc}") from exc
