@@ -1,9 +1,10 @@
+import asyncio
+import json
 from dataclasses import dataclass
 
 from openai import APIError, AsyncOpenAI
 from pydantic import BaseModel, ValidationError
-import asyncio
-import json
+
 from vinci.config import settings
 from vinci.core.exceptions import LLMAPIError
 
@@ -16,14 +17,14 @@ client = AsyncOpenAI(
 
 @dataclass
 class ToolCallRequest:
-    id: int
+    id: str
     name: str
     arguments: dict
 
 
 @dataclass
 class CallResponse:
-    content: str
+    content: str | None
     tool_calls: list[ToolCallRequest]
 
 
@@ -32,78 +33,123 @@ class LLMClient:
         self.model = model
 
     async def generate(self, prompt: str) -> str:
-
         try:
             response = await client.chat.completions.create(
-                model=self.model, messages=[{"role": "user", "content": prompt}]
+                model=self.model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
             )
-            full_answer = response.choices[0].message.content
-            if full_answer is None:
+
+            content = response.choices[0].message.content
+
+            if content is None:
                 raise LLMAPIError("LLM returned an empty response")
-            return full_answer
+
+            return content
 
         except asyncio.CancelledError:
             raise
+
         except (APIError, ConnectionError, TimeoutError) as exc:
             raise LLMAPIError(f"API call failed: {exc}") from exc
 
     async def generate_structured(
-        self, prompt: str, schema: type[BaseModel]
+        self,
+        prompt: str,
+        schema: type[BaseModel],
     ) -> BaseModel:
-        max_retry: int = 3
-        for retry in range(max_retry):
-            try:
-                data: str = await self.generate(prompt)
-                structure_response = json.loads(data)
-                return schema.model_validate(structure_response)
+        max_retries = 3
 
-            except LLMAPIError:
-                if retry == max_retry - 1:
-                    raise
+        for retry in range(max_retries):
+            try:
+                data = await self.generate(prompt)
+
+                structure_response = json.loads(data)
+
+                return schema.model_validate(structure_response)
 
             except asyncio.CancelledError:
                 raise
-            except json.JSONDecodeError as e:
-                if retry == max_retry - 1:
-                    raise ValueError("LLM returned invalid JSON") from e
-            except ValidationError as e:
-                if retry == max_retry - 1:
+
+            except LLMAPIError:
+                if retry == max_retries - 1:
+                    raise
+
+            except json.JSONDecodeError as exc:
+                if retry == max_retries - 1:
+                    raise ValueError("LLM returned invalid JSON") from exc
+
+            except ValidationError as exc:
+                if retry == max_retries - 1:
                     raise ValueError(
                         "LLM response does not match the expected structure"
-                    ) from e
+                    ) from exc
+
+        # This should never be reached because the final retry
+        # always raises or returns.
+        raise RuntimeError("Unexpected structured generation state")
 
     async def call(
-        self, messages: list[dict], tools: list[dict] | dict | None = None
+        self,
+        messages: list[dict],
+        tools: list[dict] | dict | None = None,
     ) -> CallResponse:
         if isinstance(tools, dict):
             tools = list(tools.values())
+
         if not tools:
             tools = None
 
         try:
-            kwargs: dict = {"model": self.model, "messages": messages}
+            kwargs: dict = {
+                "model": self.model,
+                "messages": messages,
+            }
+
             if tools is not None:
                 kwargs["tools"] = tools
+
             response = await client.chat.completions.create(**kwargs)
+
             message = response.choices[0].message
 
             tool_calls: list[ToolCallRequest] = []
-            for tc in message.tool_calls or []:
+
+            for tool_call in message.tool_calls or []:
                 try:
-                    arguments = json.loads(tc.function.arguments)
-                except json.JSONDecodeError as e:
+                    arguments = json.loads(tool_call.function.arguments)
+
+                except json.JSONDecodeError as exc:
                     raise ValueError(
-                        f"LLM returned invalid tool arguments for '{tc.function.name}'"
-                    ) from e
+                        "LLM returned invalid tool arguments "
+                        f"for '{tool_call.function.name}'"
+                    ) from exc
+
+                if not isinstance(arguments, dict):
+                    raise TypeError(
+                        "Tool arguments must be a JSON object "
+                        f"for '{tool_call.function.name}'"
+                    )
+
                 tool_calls.append(
                     ToolCallRequest(
-                        id=tc.id, name=tc.function.name, arguments=arguments
+                        id=tool_call.id,
+                        name=tool_call.function.name,
+                        arguments=arguments,
                     )
                 )
 
-            return CallResponse(content=message.content, tool_calls=tool_calls)
+            return CallResponse(
+                content=message.content,
+                tool_calls=tool_calls,
+            )
 
         except asyncio.CancelledError:
             raise
+
         except (APIError, ConnectionError, TimeoutError) as exc:
             raise LLMAPIError(f"API call failed: {exc}") from exc
