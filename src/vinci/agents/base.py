@@ -11,7 +11,7 @@ MAX_RESULT_CHAR: int = 5000
 @dataclass
 class AgentResult:
     success: bool
-    total_itrations: int
+    total_iterations: int
     total_tool_calls: int
     error: str | None = None
     final_answer: str | None = None
@@ -23,58 +23,56 @@ class Agent:
         self,
         llm: LLMClient,
         registry: ToolsRegistry,
-        max_itrations: int = 30,
+        max_iterations: int = 30,
         time_limit: float = 10 * 60,
     ):
         self.llm = llm
         self.registry = registry
-        self.max_itrations = max_itrations
+        self.max_iterations = max_iterations
         self.time_limit = time_limit
 
     def serialized(self, result: ToolResult) -> str:
-        content: str = ""
         if result.success is True:
-            content = json.dumps({"content": result.data})
-        if result.error is False:
-            content = json.dumps({"content": {"error": result.error}})
-        return content
+            return json.dumps({"content": result.data})
+        return json.dumps({"content": {"error": result.error}})
 
     async def run(self, task: str) -> AgentResult:
-        start = time.pref_counter()
-        messages: list = []
-        itrations: int = 0
+        start = time.perf_counter()
+        messages: list = [{"role": "user", "content": task}]
+        iterations: int = 0
         tool_calls: int = 0
 
-        while itrations < self.max_itrations:
-            if (time.pref_counter() - start) > self.time_limit:
+        while iterations < self.max_iterations:
+            if (time.perf_counter() - start) > self.time_limit:
                 return AgentResult(
                     success=False,
                     error="Timeout Error",
-                    total_itrations=itrations,
+                    total_iterations=iterations,
                     total_tool_calls=tool_calls,
+                    durations_ms=(time.perf_counter() - start) * 1000,
                 )
-            itrations += 1
-            response: CallResponse = await LLMClient.call(
-                messages, ToolsRegistry.list_schemas()
+            iterations += 1
+            response: CallResponse = await self.llm.call(
+                messages, self.registry.list_schemas()
             )
 
             if len(response.tool_calls) == 0:
                 return AgentResult(
                     success=True,
                     total_tool_calls=tool_calls,
-                    total_itrations=itrations,
+                    total_iterations=iterations,
                     final_answer=response.content,
                 )
             messages.append(
                 {
-                    "role": "assistent",
+                    "role": "assistant",
                     "content": response.content,
                     "tool_calls": response.tool_calls,
                 }
             )
             for tool in response.tool_calls:
                 tool_calls += 1
-                result = await ToolsRegistry.execute(
+                result = await self.registry.execute(
                     tool_name=tool.name, args=tool.arguments
                 )
                 content = self.serialized(result)
@@ -88,10 +86,10 @@ class Agent:
                         "content": content,
                     }
                 )
-            return AgentResult(
-                success=False,
-                error="Maximum itrations exceeded",
-                total_itrations=itrations,
-                total_tool_calls=tool_calls,
-                durations_ms=(time.pref_counter() - start) * 1000,
-            )
+        return AgentResult(
+            success=False,
+            error="Maximum iterations exceeded",
+            total_iterations=iterations,
+            total_tool_calls=tool_calls,
+            durations_ms=(time.perf_counter() - start) * 1000,
+        )

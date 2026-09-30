@@ -72,7 +72,7 @@ class LLMClient:
                         "LLM response does not match the expected structure"
                     ) from e
 
-    async def chat(
+    async def call(
         self, messages: list[dict], tools: list[dict] | dict | None = None
     ) -> CallResponse:
         if isinstance(tools, dict):
