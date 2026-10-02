@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import json
 import time
-from vinci.llm.client import LLMClient, CallResponse
+from vinci.llm.client import LLMClient, CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 from vinci.tools.registry import ToolsRegistry
 
@@ -36,6 +36,23 @@ class Agent:
             return json.dumps({"content": result.data})
         return json.dumps({"content": {"error": result.error}})
 
+    def assistant_formated_tool_call(
+        self, tool_calls: list[ToolCallRequest]
+    ) -> list[dict]:
+        formated_calls = []
+        for tc in tool_calls:
+            formated_calls.append(
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.name,
+                        "arguments": json.dumps(tc.arguments),
+                    },
+                }
+            )
+        return formated_calls
+
     async def run(self, task: str) -> AgentResult:
         start = time.perf_counter()
         messages: list = [{"role": "user", "content": task}]
@@ -62,12 +79,15 @@ class Agent:
                     total_tool_calls=tool_calls,
                     total_iterations=iterations,
                     final_answer=response.content,
+                    durations_ms=(time.perf_counter() - start) * 1000,
                 )
             messages.append(
                 {
                     "role": "assistant",
                     "content": response.content,
-                    "tool_calls": response.tool_calls,
+                    "tool_calls": self.assistant_formated_tool_call(
+                        response.tool_calls
+                    ),
                 }
             )
             for tool in response.tool_calls:
@@ -81,7 +101,7 @@ class Agent:
                 messages.append(
                     {
                         "role": "tool",
-                        "tool_id": tool.id,
+                        "tool_call_id": tool.id,
                         "name": tool.name,
                         "content": content,
                     }
