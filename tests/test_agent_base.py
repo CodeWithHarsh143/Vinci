@@ -66,7 +66,7 @@ async def test_agent_executes_tool_then_returns_final_answer():
             assert messages[1]["tool_calls"]
 
             assert messages[2]["role"] == "tool"
-            assert messages[2]["tool_id"] == "call_1"
+            assert messages[2]["tool_call_id"] == "call_1"
 
             return CallResponse(
                 content="The file contains Hello",
