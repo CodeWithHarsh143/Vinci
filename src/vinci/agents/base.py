@@ -15,7 +15,7 @@ class AgentResult:
     total_tool_calls: int
     error: str | None = None
     final_answer: str | None = None
-    durations_ms: float = 0.0
+    duration_ms: float = 0.0
 
 
 class Agent:
@@ -31,27 +31,30 @@ class Agent:
         self.max_iterations = max_iterations
         self.time_limit = time_limit
 
-    def serialized(self, result: ToolResult) -> str:
+    def serialize(self, result: ToolResult) -> str:
         if result.success is True:
             return json.dumps({"content": result.data})
         return json.dumps({"content": {"error": result.error}})
 
-    def assistant_formated_tool_call(
+    def assistant_formatted_tool_call(
         self, tool_calls: list[ToolCallRequest]
     ) -> list[dict]:
-        formated_calls = []
+        formatted_calls = []
         for tc in tool_calls:
-            formated_calls.append(
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.name,
-                        "arguments": json.dumps(tc.arguments),
-                    },
+            entry: dict = {
+                "id": tc.id,
+                "type": "function",
+                "function": {
+                    "name": tc.name,
+                    "arguments": json.dumps(tc.arguments),
+                },
+            }
+            if tc.thought_signature:
+                entry["extra_content"] = {
+                    "google": {"thought_signature": tc.thought_signature}
                 }
-            )
-        return formated_calls
+            formatted_calls.append(entry)
+        return formatted_calls
 
     async def run(self, task: str) -> AgentResult:
         start = time.perf_counter()
@@ -66,7 +69,7 @@ class Agent:
                     error="Timeout Error",
                     total_iterations=iterations,
                     total_tool_calls=tool_calls,
-                    durations_ms=(time.perf_counter() - start) * 1000,
+                    duration_ms=(time.perf_counter() - start) * 1000,
                 )
             iterations += 1
             response: CallResponse = await self.llm.call(
@@ -79,13 +82,13 @@ class Agent:
                     total_tool_calls=tool_calls,
                     total_iterations=iterations,
                     final_answer=response.content,
-                    durations_ms=(time.perf_counter() - start) * 1000,
+                    duration_ms=(time.perf_counter() - start) * 1000,
                 )
             messages.append(
                 {
                     "role": "assistant",
                     "content": response.content,
-                    "tool_calls": self.assistant_formated_tool_call(
+                    "tool_calls": self.assistant_formatted_tool_call(
                         response.tool_calls
                     ),
                 }
@@ -95,7 +98,7 @@ class Agent:
                 result = await self.registry.execute(
                     tool_name=tool.name, args=tool.arguments
                 )
-                content = self.serialized(result)
+                content = self.serialize(result)
                 if len(content) > MAX_RESULT_CHAR:
                     content = content[:MAX_RESULT_CHAR] + "..truncated"
                 messages.append(
@@ -111,5 +114,5 @@ class Agent:
             error="Maximum iterations exceeded",
             total_iterations=iterations,
             total_tool_calls=tool_calls,
-            durations_ms=(time.perf_counter() - start) * 1000,
+            duration_ms=(time.perf_counter() - start) * 1000,
         )

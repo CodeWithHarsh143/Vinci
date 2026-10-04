@@ -33,7 +33,7 @@ async def test_agent_returns_final_answer():
     assert result.total_iterations == 1
     assert result.total_tool_calls == 0
     assert result.error is None
-    assert result.durations_ms >= 0
+    assert result.duration_ms >= 0
 
 
 @pytest.mark.asyncio
@@ -271,7 +271,7 @@ async def test_agent_stops_after_max_iterations():
     assert result.total_iterations == 3
     assert result.total_tool_calls == 3
     assert result.final_answer is None
-    assert result.durations_ms >= 0
+    assert result.duration_ms >= 0
 
 
 @pytest.mark.asyncio
@@ -312,4 +312,4 @@ async def test_agent_timeout():
     assert result.error == "Timeout Error"
     assert result.total_iterations == 0
     assert result.total_tool_calls == 0
-    assert result.durations_ms >= 0
+    assert result.duration_ms >= 0

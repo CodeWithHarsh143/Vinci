@@ -20,6 +20,7 @@ class ToolCallRequest:
     id: str
     name: str
     arguments: dict
+    thought_signature: str | None = None
 
 
 @dataclass
@@ -135,11 +136,19 @@ class LLMClient:
                         f"for '{tool_call.function.name}'"
                     )
 
+                thought_signature: str | None = None
+                extra = getattr(tool_call, "extra_content", None)
+                if isinstance(extra, dict):
+                    google = extra.get("google", {})
+                    if isinstance(google, dict):
+                        thought_signature = google.get("thought_signature")
+
                 tool_calls.append(
                     ToolCallRequest(
                         id=tool_call.id,
                         name=tool_call.function.name,
                         arguments=arguments,
+                        thought_signature=thought_signature,
                     )
                 )
 

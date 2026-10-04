@@ -49,7 +49,7 @@ async def test_failed_task(taskQueue):
 
 
 @pytest.mark.asyncio
-async def test_concurrent_exexution(taskQueue):
+async def test_concurrent_execution(taskQueue):
     tasks = [create_task() for _ in range(5)]
     start = time.perf_counter()
     await asyncio.gather(*(taskQueue.submit(task) for task in tasks))
