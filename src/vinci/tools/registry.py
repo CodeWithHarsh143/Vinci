@@ -20,7 +20,7 @@ class ToolsRegistry:
                 "function": {
                     "name": tool.name,
                     "description": tool.description,
-                    "parameters_schema": tool.parameters_schema,
+                    "parameters": tool.parameters_schema,
                 },
             }
         return schemas
@@ -34,6 +34,6 @@ class ToolsRegistry:
         if not tool:
             return ToolResult(
                 success=False,
-                error=f"Unknown tool: {tool_name}. Available:{''.join(self.available)}",
+                error=f"Unknown tool: {tool_name}. Available: {', '.join(self.available)}",
             )
         return await tool.execute(arguments=args)

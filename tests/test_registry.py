@@ -66,7 +66,7 @@ def test_list_schemas_contains_registered_tool(registry, echo_tool):
     assert entry["function"]["name"] == "echo"
     assert entry["function"]["description"] == "Echoes back the input text"
     assert (
-        entry["function"]["parameters_schema"]
+        entry["function"]["parameters"]
         == echo_tool.parameters_schema
     )
 

@@ -1,6 +1,6 @@
 import pytest
 
-from vinci.agents.base import Agent, AgentResult
+from vinci.agents.base import Agent
 from vinci.llm.client import CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 
