@@ -23,12 +23,6 @@ Vinci needs a reliable execution loop — LLM reasoning connected to real tool e
 - [x] Agent loop (tool calls → execution → results → repeat)
 - [x] Termination (final answer / max iterations / time limit)
 - [x] 43 passing tests
-
-
-- [x] Fix `llm.call` vs `llm.chat` mismatch
-- [x] Add missing `durations_ms` on success path
-- [x] Rename `tool_id` → `tool_call_id`
-- [x] Convert assistant messages to OpenAI-compatible dictionaries
 ### Cleanup before exit
 - [ ] End-to-end demo (user → agent → real tool → real LLM → answer)
 
