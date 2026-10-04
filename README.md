@@ -22,7 +22,7 @@ Vinci needs a reliable execution loop — LLM reasoning connected to real tool e
 - [x] `ToolsRegistry` (registration, schema generation, dispatch)
 - [x] Agent loop (tool calls → execution → results → repeat)
 - [x] Termination (final answer / max iterations / time limit)
-- [x] 43 passing tests
+- [x] 45 passing tests
 ### Cleanup before exit
 - [ ] End-to-end demo (user → agent → real tool → real LLM → answer)
 
