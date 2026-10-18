@@ -4,6 +4,7 @@ import time
 from vinci.llm.client import LLMClient, CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 from vinci.tools.registry import ToolsRegistry
+from .context import RunContext
 
 MAX_RESULT_CHAR: int = 5000
 
@@ -28,6 +29,7 @@ class Agent:
     ):
         self.llm = llm
         self.registry = registry
+        self.context = RunContext()
         self.max_iterations = max_iterations
         self.time_limit = time_limit
 
@@ -56,7 +58,14 @@ class Agent:
             formatted_calls.append(entry)
         return formatted_calls
 
-    async def run(self, task: str) -> AgentResult:
+    async def run(self, task: str, timeout_sec: float | None = None) -> AgentResult:
+        """Start the agent loop.
+
+        The method returns only after the loop finishes (or is cancelled).
+        """
+        # Store the deadline if the user supplied a timeout
+        if timeout_sec is not None:
+            self.context.deadline = __import__("time").monotonic() + timeout_sec
         start = time.perf_counter()
         messages: list = [{"role": "user", "content": task}]
         iterations: int = 0
