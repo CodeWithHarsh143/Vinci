@@ -1,8 +1,7 @@
+import asyncio
 from dataclasses import dataclass
 import json
 import time
-
-from pydantic_core.core_schema import to_string_ser_schema
 from vinci.llm.client import LLMClient, CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 from vinci.tools.registry import ToolsRegistry
@@ -36,8 +35,13 @@ class Agent:
         self.context = RunContext()
         self.max_iterations = max_iterations
         self.time_limit = time_limit
-        self.result = queue.Queue()
+        self.result_queue = queue.Queue()
+        self._cancel_event = threading.Event()
+        self._thread = None
 
+    # ------------------------------------------------------------------
+    # Helper / utility methods (unchanged from the single‑threaded version)
+    # ------------------------------------------------------------------
     def serialize(self, result: ToolResult) -> str:
         if result.success is True:
             return json.dumps({"content": result.data})
@@ -63,40 +67,49 @@ class Agent:
             formatted_calls.append(entry)
         return formatted_calls
 
+    # ------------------------------------------------------------------
+    # The agent’s reasoning loop – now *correctly* inside the while‑loop
+    # ------------------------------------------------------------------
     async def _loop(self, task: str) -> None:
-
+        """Iterate until a final answer, cancellation or a timeout."""
         start = time.perf_counter()
         messages: list = [{"role": "user", "content": task}]
-        # local counter that we also mirror in the shared state
+
         iterations: int = 0
         tool_calls: int = 0
 
         while iterations < self.max_iterations:
-            # ---- check hard time‑limit and the per‑run deadline -------------
+            # ------------------- cancellation check -----------------
+            # .wait(0.5) blocks up to 0.5 s; we then explicitly test the flag.
+            self._cancel_event.wait(0.5)
+            if self._cancel_event.is_set():
+                self.context.state["error"] = "cancelled"
+                break
+
+            # ------------------- deadline checks -----------------
             elapsed = time.perf_counter() - start
             if elapsed > self.time_limit:
                 self.context.state["error"] = "Timeout Error"
                 break
-            if self.context.deadline is not None and elapsed > self.context.deadline:
+            if self.context.deadline is not None and elapsed >= self.context.deadline:
                 self.context.state["error"] = "Deadline exceeded"
                 break
 
-            # ---- progress the shared iteration counter --------------------
+            # ------------------- progress counters -----------------
             iterations += 1
             self.context.state["iterations"] = iterations
 
-            # ---- ask the LLM (pass the shared context) --------------------
+            # ------------------- ask the LLM -----------------
             response: CallResponse = await self.llm.call(
-                messages,
-                self.registry.list_schemas(),
+                messages, self.registry.list_schemas()
             )
 
+            # ------------------- no tool call → final answer -----
             if len(response.tool_calls) == 0:
-                # no tool call → treat as final answer
                 self.context.state["final_answer"] = response.content
-                break
+                break  # <‑‑ correct: break stays inside the while
 
-            # ---- append assistant message with tool calls -----------------
+            # ------------------- append assistant message ---------
             messages.append(
                 {
                     "role": "assistant",
@@ -107,7 +120,7 @@ class Agent:
                 }
             )
 
-            # ---- execute each tool and record results ----------------------
+            # ------------------- execute each tool -----------------
             for tool in response.tool_calls:
                 result = await self.registry.execute(
                     tool_name=tool.name, args=tool.arguments
@@ -126,20 +139,17 @@ class Agent:
                 tool_calls += 1
                 self.context.state["tool_calls"] = tool_calls
 
-            # ---- if the loop terminated because max_iterations was reached -------
+        # ---------- post‑loop: build the final AgentResult ----------
         error = self.context.state.get("error")
         final_answer = self.context.state.get("final_answer")
         if not error and final_answer is None:
             # no explicit error and no final answer → iterations exhausted
             self.context.state["error"] = "Maximum iterations exceeded"
 
-        # ---- build the final AgentResult from the shared state ------------
-        error = self.context.state.get("error")
-        final_answer = self.context.state.get("final_answer")
         duration_ms = (time.perf_counter() - start) * 1000
 
         if error:
-            self.result.put(
+            self.result_queue.put(
                 AgentResult(
                     success=False,
                     error=error,
@@ -149,24 +159,47 @@ class Agent:
                     final_answer=final_answer,
                 )
             )
-        self.result.put(
-            AgentResult(
-                success=True,
-                total_iterations=iterations,
-                total_tool_calls=tool_calls,
-                duration_ms=duration_ms,
-                final_answer=final_answer,
+        else:
+            self.result_queue.put(
+                AgentResult(
+                    success=True,
+                    total_iterations=iterations,
+                    total_tool_calls=tool_calls,
+                    duration_ms=duration_ms,
+                    final_answer=final_answer,
+                )
             )
-        )
 
-    async def run(self, task: str, timeout_sec: float | None = None) -> None:
+    # ------------------------------------------------------------------
+    # Wrapper that runs the coroutine in a *new* asyncio event loop
+    # ------------------------------------------------------------------
+    def _call_loop(self, task: str) -> None:
+        asyncio.run(self._loop(task))
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def join(self) -> None:
+        """Block until the internal worker thread finishes."""
+        if self._thread is not None:
+            self._thread.join()
+
+    def cancel(self) -> None:
+        """Ask the running loop to stop at its next safe point."""
+        self._cancel_event.set()
+
+    def run(self, task: str, timeout_sec: float | None = None) -> None:
         """Start the agent loop.
 
         The method returns only after the loop finishes (or is cancelled).
         """
+        # --------checking if agent is on work ------------------------------
+        if self._thread is not None:
+            raise RuntimeError("Agent has already been started")
+
         # ---- deadline -------------------------------------------------------
         if timeout_sec is not None:
-            self.context.deadline = __import__("time").monotonic() + timeout_sec
+            self.context.deadline = time.monotonic() + timeout_sec
 
         # ---- initialise shared state (run‑context “blackboard”) ------------
         self.context.state.setdefault("error", None)
@@ -174,5 +207,7 @@ class Agent:
         self.context.state.setdefault("iterations", 0)
         self.context.state.setdefault("tool_calls", 0)
 
-        thread = threading.Thread(target=self._loop, args=[task], daemon=True)
-        thread.start()
+        self._thread = threading.Thread(
+            target=self._call_loop, args=(task,), daemon=True
+        )
+        self._thread.start()
