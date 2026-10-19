@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import threading
 import uuid
 from dataclasses import dataclass
 from typing import Dict, Any, Optional
@@ -13,9 +13,10 @@ class RunContext:
     helpers that the loop (and later threads) inspect frequently.
     """
 
-    run_id: str = ""                # filled automatically by __post_init__
-    deadline: float | None = None   # None → no hard time limit
-    state: Dict[str, Any] = None    # mutable dictionary – the "blackboard"
+    run_id: str = ""  # filled automatically by __post_init__
+    cv = threading.Condition()
+    deadline: float | None = None  # None → no hard time limit
+    state: Dict[str, Any] = None  # mutable dictionary – the "blackboard"
 
     def __post_init__(self) -> None:
         self.run_id = str(uuid.uuid4()) if not self.run_id else self.run_id
