@@ -1,10 +1,14 @@
 from dataclasses import dataclass
 import json
 import time
+
+from pydantic_core.core_schema import to_string_ser_schema
 from vinci.llm.client import LLMClient, CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 from vinci.tools.registry import ToolsRegistry
 from .context import RunContext
+import queue
+import threading
 
 MAX_RESULT_CHAR: int = 5000
 
@@ -32,6 +36,7 @@ class Agent:
         self.context = RunContext()
         self.max_iterations = max_iterations
         self.time_limit = time_limit
+        self.result = queue.Queue()
 
     def serialize(self, result: ToolResult) -> str:
         if result.success is True:
@@ -58,20 +63,7 @@ class Agent:
             formatted_calls.append(entry)
         return formatted_calls
 
-    async def run(self, task: str, timeout_sec: float | None = None) -> AgentResult:
-        """Start the agent loop.
-
-        The method returns only after the loop finishes (or is cancelled).
-        """
-        # ---- deadline -------------------------------------------------------
-        if timeout_sec is not None:
-            self.context.deadline = __import__("time").monotonic() + timeout_sec
-
-        # ---- initialise shared state (run‑context “blackboard”) ------------
-        self.context.state.setdefault("error", None)
-        self.context.state.setdefault("final_answer", None)
-        self.context.state.setdefault("iterations", 0)
-        self.context.state.setdefault("tool_calls", 0)
+    async def _loop(self, task: str) -> None:
 
         start = time.perf_counter()
         messages: list = [{"role": "user", "content": task}]
@@ -147,18 +139,40 @@ class Agent:
         duration_ms = (time.perf_counter() - start) * 1000
 
         if error:
-            return AgentResult(
-                success=False,
-                error=error,
+            self.result.put(
+                AgentResult(
+                    success=False,
+                    error=error,
+                    total_iterations=iterations,
+                    total_tool_calls=tool_calls,
+                    duration_ms=duration_ms,
+                    final_answer=final_answer,
+                )
+            )
+        self.result.put(
+            AgentResult(
+                success=True,
                 total_iterations=iterations,
                 total_tool_calls=tool_calls,
                 duration_ms=duration_ms,
                 final_answer=final_answer,
             )
-        return AgentResult(
-            success=True,
-            total_iterations=iterations,
-            total_tool_calls=tool_calls,
-            duration_ms=duration_ms,
-            final_answer=final_answer,
         )
+
+    async def run(self, task: str, timeout_sec: float | None = None) -> None:
+        """Start the agent loop.
+
+        The method returns only after the loop finishes (or is cancelled).
+        """
+        # ---- deadline -------------------------------------------------------
+        if timeout_sec is not None:
+            self.context.deadline = __import__("time").monotonic() + timeout_sec
+
+        # ---- initialise shared state (run‑context “blackboard”) ------------
+        self.context.state.setdefault("error", None)
+        self.context.state.setdefault("final_answer", None)
+        self.context.state.setdefault("iterations", 0)
+        self.context.state.setdefault("tool_calls", 0)
+
+        thread = threading.Thread(target=self._loop, args=[task], daemon=True)
+        thread.start()
