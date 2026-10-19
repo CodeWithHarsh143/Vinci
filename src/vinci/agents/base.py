@@ -63,36 +63,48 @@ class Agent:
 
         The method returns only after the loop finishes (or is cancelled).
         """
-        # Store the deadline if the user supplied a timeout
+        # ---- deadline -------------------------------------------------------
         if timeout_sec is not None:
             self.context.deadline = __import__("time").monotonic() + timeout_sec
+
+        # ---- initialise shared state (run‑context “blackboard”) ------------
+        self.context.state.setdefault("error", None)
+        self.context.state.setdefault("final_answer", None)
+        self.context.state.setdefault("iterations", 0)
+        self.context.state.setdefault("tool_calls", 0)
+
         start = time.perf_counter()
         messages: list = [{"role": "user", "content": task}]
+        # local counter that we also mirror in the shared state
         iterations: int = 0
         tool_calls: int = 0
 
         while iterations < self.max_iterations:
-            if (time.perf_counter() - start) > self.time_limit:
-                return AgentResult(
-                    success=False,
-                    error="Timeout Error",
-                    total_iterations=iterations,
-                    total_tool_calls=tool_calls,
-                    duration_ms=(time.perf_counter() - start) * 1000,
-                )
+            # ---- check hard time‑limit and the per‑run deadline -------------
+            elapsed = time.perf_counter() - start
+            if elapsed > self.time_limit:
+                self.context.state["error"] = "Timeout Error"
+                break
+            if self.context.deadline is not None and elapsed > self.context.deadline:
+                self.context.state["error"] = "Deadline exceeded"
+                break
+
+            # ---- progress the shared iteration counter --------------------
             iterations += 1
+            self.context.state["iterations"] = iterations
+
+            # ---- ask the LLM (pass the shared context) --------------------
             response: CallResponse = await self.llm.call(
-                messages, self.registry.list_schemas()
+                messages,
+                self.registry.list_schemas(),
             )
 
             if len(response.tool_calls) == 0:
-                return AgentResult(
-                    success=True,
-                    total_tool_calls=tool_calls,
-                    total_iterations=iterations,
-                    final_answer=response.content,
-                    duration_ms=(time.perf_counter() - start) * 1000,
-                )
+                # no tool call → treat as final answer
+                self.context.state["final_answer"] = response.content
+                break
+
+            # ---- append assistant message with tool calls -----------------
             messages.append(
                 {
                     "role": "assistant",
@@ -102,8 +114,9 @@ class Agent:
                     ),
                 }
             )
+
+            # ---- execute each tool and record results ----------------------
             for tool in response.tool_calls:
-                tool_calls += 1
                 result = await self.registry.execute(
                     tool_name=tool.name, args=tool.arguments
                 )
@@ -118,10 +131,34 @@ class Agent:
                         "content": content,
                     }
                 )
+                tool_calls += 1
+                self.context.state["tool_calls"] = tool_calls
+
+            # ---- if the loop terminated because max_iterations was reached -------
+        error = self.context.state.get("error")
+        final_answer = self.context.state.get("final_answer")
+        if not error and final_answer is None:
+            # no explicit error and no final answer → iterations exhausted
+            self.context.state["error"] = "Maximum iterations exceeded"
+
+        # ---- build the final AgentResult from the shared state ------------
+        error = self.context.state.get("error")
+        final_answer = self.context.state.get("final_answer")
+        duration_ms = (time.perf_counter() - start) * 1000
+
+        if error:
+            return AgentResult(
+                success=False,
+                error=error,
+                total_iterations=iterations,
+                total_tool_calls=tool_calls,
+                duration_ms=duration_ms,
+                final_answer=final_answer,
+            )
         return AgentResult(
-            success=False,
-            error="Maximum iterations exceeded",
+            success=True,
             total_iterations=iterations,
             total_tool_calls=tool_calls,
-            duration_ms=(time.perf_counter() - start) * 1000,
+            duration_ms=duration_ms,
+            final_answer=final_answer,
         )
