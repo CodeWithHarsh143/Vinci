@@ -5,8 +5,10 @@ from dataclasses import dataclass
 from openai import APIError, AsyncOpenAI
 from pydantic import BaseModel, ValidationError
 
+from vinci.agents.context import RunContext
 from vinci.config import settings
 from vinci.core.exceptions import LLMAPIError
+from vinci.agents.context import RunContext
 
 
 client = AsyncOpenAI(
@@ -98,6 +100,7 @@ class LLMClient:
         self,
         messages: list[dict],
         tools: list[dict] | dict | None = None,
+        content: RunContext | None = None,
     ) -> CallResponse:
         if isinstance(tools, dict):
             tools = list(tools.values())
