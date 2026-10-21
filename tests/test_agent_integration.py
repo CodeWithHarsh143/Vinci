@@ -1,9 +1,17 @@
 import pytest
-
 from vinci.agents.base import Agent
 from vinci.tools.filesystem import ReadFileTool
 from vinci.tools.registry import ToolsRegistry
 from vinci.llm.client import CallResponse, ToolCallRequest
+
+
+# ----------------------------------------------------------------------
+# Helper: run the agent and obtain the result from the queue.
+# ----------------------------------------------------------------------
+def _run_and_get_result(agent, task):
+    agent.run(task)               # run() starts the thread and returns immediately
+    agent.join()                  # block until the thread finishes
+    return agent.result_queue.get()   # get the AgentResult that the thread placed in the queue
 
 
 @pytest.fixture
@@ -25,6 +33,9 @@ def registry(read_file: ReadFileTool) -> ToolsRegistry:
     return registry
 
 
+# ----------------------------------------------------------------------
+# Test 1 – agent executes a tool then returns a final answer
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_executes_tool_then_returns_final_answer(create_file, registry):
     class FakeLLM:
@@ -70,7 +81,7 @@ async def test_agent_executes_tool_then_returns_final_answer(create_file, regist
 
     llm = FakeLLM()
     agent = Agent(llm=llm, registry=registry)
-    result = await agent.run("Read test.txt")
+    result = _run_and_get_result(agent, "Read test.txt")
 
     assert result.success is True
     assert result.final_answer == "The file contains Hello"
@@ -79,6 +90,9 @@ async def test_agent_executes_tool_then_returns_final_answer(create_file, regist
     assert result.error is None
 
 
+# ----------------------------------------------------------------------
+# Test 2 – agent executes a tool and gets a "file not found" error
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_executes_tool_then_returns_file_not_foundError(registry):
     class FakeLLM:
@@ -124,7 +138,7 @@ async def test_agent_executes_tool_then_returns_file_not_foundError(registry):
 
     llm = FakeLLM()
     agent = Agent(llm=llm, registry=registry)
-    result = await agent.run("Read test.txt")
+    result = _run_and_get_result(agent, "Read test.txt")
 
     assert result.success is True
     assert result.final_answer == "The file contains Hello"

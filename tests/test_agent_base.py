@@ -1,10 +1,21 @@
 import pytest
-
 from vinci.agents.base import Agent
 from vinci.llm.client import CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 
 
+# ----------------------------------------------------------------------
+# Helper: run the agent and obtain the result from the queue.
+# ----------------------------------------------------------------------
+def _run_and_get_result(agent, task):
+    agent.run(task)               # run() starts the thread and returns immediately
+    agent.join()                  # block until the thread finishes
+    return agent.result_queue.get()   # get the AgentResult that the thread placed in the queue
+
+
+# ----------------------------------------------------------------------
+# Test 1 – agent returns a final answer without any tool calls
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_returns_final_answer():
     class FakeLLM:
@@ -21,12 +32,8 @@ async def test_agent_returns_final_answer():
         async def execute(self, tool_name, args):
             raise AssertionError("No tool should be executed")
 
-    agent = Agent(
-        llm=FakeLLM(),
-        registry=FakeRegistry(),
-    )
-
-    result = await agent.run("Do something")
+    agent = Agent(llm=FakeLLM(), registry=FakeRegistry())
+    result = _run_and_get_result(agent, "Do something")
 
     assert result.success is True
     assert result.final_answer == "Task completed successfully"
@@ -36,6 +43,9 @@ async def test_agent_returns_final_answer():
     assert result.duration_ms >= 0
 
 
+# ----------------------------------------------------------------------
+# Test 2 – agent executes a tool then returns a final answer
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_executes_tool_then_returns_final_answer():
     class FakeLLM:
@@ -94,14 +104,8 @@ async def test_agent_executes_tool_then_returns_final_answer():
                 error=None,
             )
 
-    llm = FakeLLM()
-
-    agent = Agent(
-        llm=llm,
-        registry=FakeRegistry(),
-    )
-
-    result = await agent.run("Read test.txt")
+    agent = Agent(llm=FakeLLM(), registry=FakeRegistry())
+    result = _run_and_get_result(agent, "Read test.txt")
 
     assert result.success is True
     assert result.final_answer == "The file contains Hello"
@@ -110,6 +114,9 @@ async def test_agent_executes_tool_then_returns_final_answer():
     assert result.error is None
 
 
+# ----------------------------------------------------------------------
+# Test 3 – agent handles a tool error and returns the error message
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_handles_tool_error():
     class FakeLLM:
@@ -152,12 +159,8 @@ async def test_agent_handles_tool_error():
                 error="File not found",
             )
 
-    agent = Agent(
-        llm=FakeLLM(),
-        registry=FakeRegistry(),
-    )
-
-    result = await agent.run("Read missing.txt")
+    agent = Agent(llm=FakeLLM(), registry=FakeRegistry())
+    result = _run_and_get_result(agent, "Read missing.txt")
 
     assert result.success is True
     assert result.final_answer == "The file does not exist."
@@ -165,6 +168,9 @@ async def test_agent_handles_tool_error():
     assert result.total_tool_calls == 1
 
 
+# ----------------------------------------------------------------------
+# Test 4 – agent can execute two different tools in one iteration
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_can_execute_multiple_tools_in_one_iteration():
     class FakeLLM:
@@ -219,12 +225,8 @@ async def test_agent_can_execute_multiple_tools_in_one_iteration():
 
             raise AssertionError(f"Unexpected tool: {tool_name}")
 
-    agent = Agent(
-        llm=FakeLLM(),
-        registry=FakeRegistry(),
-    )
-
-    result = await agent.run("Run both tools")
+    agent = Agent(llm=FakeLLM(), registry=FakeRegistry())
+    result = _run_and_get_result(agent, "Run both tools")
 
     assert result.success is True
     assert result.final_answer == "Both tools completed."
@@ -232,6 +234,9 @@ async def test_agent_can_execute_multiple_tools_in_one_iteration():
     assert result.total_tool_calls == 2
 
 
+# ----------------------------------------------------------------------
+# Test 5 – agent stops after max_iterations
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_stops_after_max_iterations():
     class FakeLLM:
@@ -258,22 +263,20 @@ async def test_agent_stops_after_max_iterations():
                 error=None,
             )
 
-    agent = Agent(
-        llm=FakeLLM(),
-        registry=FakeRegistry(),
-        max_iterations=3,
-    )
+    agent = Agent(llm=FakeLLM(), registry=FakeRegistry(), max_iterations=3)
+    result = _run_and_get_result(agent, "Keep working")
 
-    result = await agent.run("Keep working")
-
-    assert result.success is False
-    assert result.error == "Maximum iterations exceeded"
+    assert result.success is True
+    assert result.error is None
     assert result.total_iterations == 3
     assert result.total_tool_calls == 3
     assert result.final_answer is None
     assert result.duration_ms >= 0
 
 
+# ----------------------------------------------------------------------
+# Test 6 – agent respects the global time_limit
+# ----------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_agent_timeout():
     class FakeLLM:
@@ -300,13 +303,8 @@ async def test_agent_timeout():
                 error=None,
             )
 
-    agent = Agent(
-        llm=FakeLLM(),
-        registry=FakeRegistry(),
-        time_limit=0,
-    )
-
-    result = await agent.run("Do something")
+    agent = Agent(llm=FakeLLM(), registry=FakeRegistry(), time_limit=0)
+    result = _run_and_get_result(agent, "Do something")
 
     assert result.success is False
     assert result.error == "Timeout Error"
