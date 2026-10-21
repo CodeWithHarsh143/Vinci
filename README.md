@@ -31,15 +31,15 @@ The loop works, but failures are ad-hoc. Before RAG or code review get built on 
 
 ### Build Checklist
 
-- [ ] Execution context
-- [ ] Cancellation propagation
-- [ ] Timeout propagation
-- [ ] Structured errors
-- [ ] Agent state management
-- [ ] Configuration
-- [ ] Structured logging
-- [ ] Integration tests
-- [ ] Failure handling
+- [x] Execution context
+- [x] Cancellation propagation
+- [x] Timeout propagation
+- [x] Structured errors
+- [x] Agent state management
+- [x] Configuration
+- [x] Structured logging
+- [x] Integration tests
+- [x] Failure handling
 
 ### Expected Outcome
 
