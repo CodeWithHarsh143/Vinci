@@ -8,7 +8,27 @@ from vinci.tools.registry import ToolsRegistry
 from .context import RunContext
 import queue
 import threading
+import logging
+import uuid
 
+from vinci.agents import context
+
+# -------------------------------------------------------------------------------------
+# 1️⃣  Structured‑logging setup
+# -------------------------------------------------------------------------------------
+
+_vinci_logger = logging.getLogger("vinci")
+_vinci_logger.setLevel(logging.INFO)
+log_file = "agent.log"
+file_handler = logging.FileHandler(log_file, encoding="utf-8")
+
+file_formatter = logging.Formatter(
+    "%(asctime)s | %(run_id)s | %(levelname)s | %(message)s"
+)
+file_handler.setFormatter(file_formatter)
+_vinci_logger.addHandler(file_handler)
+
+# -----------------------------------------Constants------------------------------------
 MAX_RESULT_CHAR: int = 5000
 
 
@@ -82,21 +102,34 @@ class Agent:
             # .wait(0.5) blocks up to 0.5 s; we then explicitly test the flag.
             self._cancel_event.wait(0.5)
             if self._cancel_event.is_set():
+                _vinci_logger.info(
+                    "agent cancelled", extra={"run_id": self.context.state["run_id"]}
+                )
                 self.context.state["error"] = "cancelled"
                 break
 
             # ------------------- deadline checks -----------------
             elapsed = time.perf_counter() - start
             if elapsed > self.time_limit:
+                _vinci_logger.info(
+                    "Timeout Error", extra={"run_id": self.context.state["run_id"]}
+                )
                 self.context.state["error"] = "Timeout Error"
                 break
             if self.context.deadline is not None and elapsed >= self.context.deadline:
+                _vinci_logger.info(
+                    "deadline exceeded", extra={"run_id": self.context.state["run_id"]}
+                )
                 self.context.state["error"] = "Deadline exceeded"
                 break
 
             # ------------------- progress counters -----------------
             iterations += 1
             self.context.state["iterations"] = iterations
+            _vinci_logger.info(
+                f"iterations: {iterations}",
+                extra={"run_id": self.context.state["run_id"]},
+            )
 
             # ------------------- ask the LLM -----------------
             response: CallResponse = await self.llm.call(
@@ -104,8 +137,18 @@ class Agent:
             )
 
             # ------------------- no tool call → final answer -----
+
+            _vinci_logger.info(
+                f"LLM return tool call , Total tool calls: {response.tool_calls}",
+                extra={"run_id": self.context.state["run_id"]},
+            )
             if len(response.tool_calls) == 0:
                 self.context.state["final_answer"] = response.content
+                _vinci_logger.info(
+                    f"final answer: {response.content}",
+                    extra={"run_id": self.context.state["run_id"]},
+                )
+
                 break  # <‑‑ correct: break stays inside the while
 
             # ------------------- append assistant message ---------
@@ -127,6 +170,10 @@ class Agent:
                 content = self.serialize(result)
                 if len(content) > MAX_RESULT_CHAR:
                     content = content[:MAX_RESULT_CHAR] + "..truncated"
+                _vinci_logger.info(
+                    f"tool: {tool.name}, result: {content}",
+                    extra={"run_id": self.context.state["run_id"]},
+                )
                 messages.append(
                     {
                         "role": "tool",
@@ -205,6 +252,10 @@ class Agent:
         self.context.state.setdefault("final_answer", None)
         self.context.state.setdefault("iterations", 0)
         self.context.state.setdefault("tool_calls", 0)
+
+        run_id: str = str(uuid.uuid4())
+        self.context.state["run_id"] = run_id
+        _vinci_logger.info("agent started", extra={"run_id": run_id})
 
         self._thread = threading.Thread(
             target=self._call_loop, args=(task,), daemon=True

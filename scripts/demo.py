@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 
 from vinci.agents.base import Agent
-from vinci.core.exceptions import LLMAPIError
 from vinci.llm.client import LLMClient
 from vinci.tools.filesystem import ReadFileTool
 from vinci.tools.registry import ToolsRegistry
@@ -36,12 +35,22 @@ async def main() -> int:
     registry.register(SearchCodeTool(SANDBOX))
     agent = Agent(llm=llm, registry=registry, max_iterations=5)
 
+    # ------------------------------------------------------------------
+    # The agent runs in a daemon thread.  We start it, then wait for it to finish
+    # and pull the result from the queue (the pattern required by the threaded
+    # agent implementation).
+    # ------------------------------------------------------------------
+    agent.run("What does app.py do?")
+    agent.join()  # blocks until the thread finishes
     try:
-        result = await agent.run("What does app.py do?")
-    except LLMAPIError as exc:
-        print(f"Demo failed: LLM unavailable ({exc})")
+        result = agent.result_queue.get()  # blocking get; will succeed after join()
+    except Exception as exc:  # catch any unexpected queue errors
+        print(f"Demo failed: cannot retrieve result ({exc})")
         return 1
 
+    # ------------------------------------------------------------------
+    # Now we can inspect the result exactly as before.
+    # ------------------------------------------------------------------
     print(f"success:        {result.success}")
     print(f"iterations:     {result.total_iterations}")
     print(f"tool calls:     {result.total_tool_calls}")
