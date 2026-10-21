@@ -68,7 +68,6 @@ class Agent:
         return formatted_calls
 
     # ------------------------------------------------------------------
-    # The agent’s reasoning loop – now *correctly* inside the while‑loop
     # ------------------------------------------------------------------
     async def _loop(self, task: str) -> None:
         """Iterate until a final answer, cancellation or a timeout."""
