@@ -4,7 +4,7 @@ An AI engineering platform built progressively, version by version. Each version
 
 ---
 
-## Foundation — Complete  (M0–M3)
+## Foundation — Complete ✅ (M0–M3)
 
 Agent foundation: LLM reasoning connected to real tool execution, proven end-to-end (user → agent → real tools → real LLM → answer) with 45 passing tests.
 
@@ -22,7 +22,7 @@ Agent foundation: LLM reasoning connected to real tool execution, proven end-to-
 
 ---
 
-## V0.1 — Production Agent Core  (current)
+## V0.1 — Production Agent Core ✅ (completed)
 
 ### Why this version?
 
@@ -30,16 +30,38 @@ The loop works, but failures are ad-hoc. Before RAG or code review get built on 
 
 ### Build Checklist
 
-- [ ] Execution context
-- [ ] Cancellation propagation
-- [ ] Timeout propagation
-- [ ] Structured errors
-- [ ] Agent state management
-- [ ] Configuration
-- [ ] Structured logging
-- [ ] Integration tests
-- [ ] Failure handling
+- [x] Execution context
+- [x] Cancellation propagation
+- [x] Timeout propagation
+- [x] Structured errors
+- [x] Agent state management
+- [x] Configuration
+- [x] Structured logging
+- [x] Integration tests
+- [x] Failure handling
 
 ### Expected Outcome
 
 An agent that fails predictably, shuts down cleanly, and explains what happened — ready for RAG (V0.2) to build on.
+
+---
+
+## V0.2 — AI Engineering 🚧 (next)
+
+### Why this version?
+
+The runtime is solid, but advanced AI capabilities (retrieval‑augmented generation, code review, deterministic evaluation) require a defined pipeline and quality gates.
+
+### Build Checklist
+
+- [ ] RAG pipeline (retriever → reranker → answer generation)
+- [ ] Code review subsystem (automated static analysis + LLM findings)
+- [ ] Memory management (persistent context, summarisation)
+- [ ] Evaluation harness (reward models, success rate, failure modes)
+- [ ] Prompt engineering framework (few‑shot, chain‑of‑thought, tool use)
+- [ ] Human‑in‑the‑loop feedback loop
+- [ ] Performance benchmarking (latency, cost, token usage)
+
+### Expected Outcome
+
+A fully‑featured AI engineering platform where RAG and code review are built on top of a stable, configurable agent core, with measurable quality and performance guarantees.
