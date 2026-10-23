@@ -1,19 +1,17 @@
 import pytest
+import asyncio
 from vinci.agents.base import Agent
 from vinci.llm.client import CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
-import asyncio
 
 
 # ----------------------------------------------------------------------
 # Helper: run the agent and obtain the result from the queue.
 # ----------------------------------------------------------------------
-def _run_and_get_result(agent, task):
-    agent.run(task)  # run() starts the thread and returns immediately
-    agent.join()  # block until the thread finishes
-    return (
-        agent.result_queue.get()
-    )  # get the AgentResult that the thread placed in the queue
+def _run_and_get_result(agent, task, timeout_sec=None):
+    agent.run(task, timeout_sec=timeout_sec)  # run() starts the thread and returns immediately
+    agent.join()                  # block until the thread finishes
+    return agent.result_queue.get()   # get the AgentResult that the thread placed in the queue
 
 
 # ----------------------------------------------------------------------

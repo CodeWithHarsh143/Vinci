@@ -1,4 +1,5 @@
 import asyncio
+import os
 from dataclasses import dataclass
 import json
 import time
@@ -47,9 +48,15 @@ class Agent:
         self,
         llm: LLMClient,
         registry: ToolsRegistry,
-        max_iterations: int = 30,
-        time_limit: float = 10 * 60,
-    ):
+        max_iterations: int | None = None,
+        time_limit: float | None = None,
+    ) -> None:
+        # ---- configuration from environment (if not supplied explicitly) -----
+        if max_iterations is None:
+            max_iterations = int(os.getenv("VINCI_MAX_ITERATIONS", "30"))
+        if time_limit is None:
+            time_limit = float(os.getenv("VINCI_TIME_LIMIT", "600"))
+
         self.llm = llm
         self.registry = registry
         self.context = RunContext()
