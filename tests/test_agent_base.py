@@ -2,15 +2,18 @@ import pytest
 from vinci.agents.base import Agent
 from vinci.llm.client import CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
+import asyncio
 
 
 # ----------------------------------------------------------------------
 # Helper: run the agent and obtain the result from the queue.
 # ----------------------------------------------------------------------
 def _run_and_get_result(agent, task):
-    agent.run(task)               # run() starts the thread and returns immediately
-    agent.join()                  # block until the thread finishes
-    return agent.result_queue.get()   # get the AgentResult that the thread placed in the queue
+    agent.run(task)  # run() starts the thread and returns immediately
+    agent.join()  # block until the thread finishes
+    return (
+        agent.result_queue.get()
+    )  # get the AgentResult that the thread placed in the queue
 
 
 # ----------------------------------------------------------------------
@@ -311,3 +314,39 @@ async def test_agent_timeout():
     assert result.total_iterations == 0
     assert result.total_tool_calls == 0
     assert result.duration_ms >= 0
+
+
+@pytest.mark.asyncio
+async def test_cancel():
+    class FakeLLM:
+        async def call(self, messages, tools):
+            return CallResponse(
+                content=None,
+                tool_calls=[
+                    ToolCallRequest(
+                        id="call_1",
+                        name="some_tool",
+                        arguments={},
+                    )
+                ],
+            )
+
+    class FakeRegistry:
+        def list_schemas(self):
+            return []
+
+        async def execute(self, tool_name, args):
+            return ToolResult(
+                success=True,
+                data="result",
+                error=None,
+            )
+
+    agent = Agent(llm=FakeLLM, registry=FakeRegistry)
+    agent.run("some task")
+    await asyncio.sleep(0.2)  # let the loop start
+    agent.cancel()  # request cancellation
+    agent.join()  # wait for thread to stop
+    result = agent.result_queue.get()
+    assert result.success is False
+    assert result.error == "cancelled"
