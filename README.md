@@ -4,7 +4,7 @@ An AI engineering platform built progressively, version by version. Each version
 
 ---
 
-## Foundation — Complete 
+## Foundation — Complete  (M0–M3)
 
 Agent foundation: LLM reasoning connected to real tool execution, proven end-to-end (user → agent → real tools → real LLM → answer) with 45 passing tests.
 
@@ -47,7 +47,7 @@ An agent that fails predictably, shuts down cleanly, and explains what happened 
 
 ---
 
-## V0.2 — AI Engineering (current)
+## V0.2 — AI Engineering (next)
 
 ### Why this version?
 
