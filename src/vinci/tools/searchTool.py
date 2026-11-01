@@ -6,7 +6,25 @@ from pathlib import Path
 from vinci.schemas.toolsSchema import SearchCodeArg
 
 SEARCHCODE_NAME = "search_code"
-SEARCHCODE_DESCRIPTION = ""
+SEARCHCODE_DESCRIPTION = """
+Search the codebase for a given text pattern or regular expression.
+
+Use this tool to locate function definitions, class declarations, variable
+references, imports, method calls, configuration values, or any other
+code patterns across the project.
+
+The search is performed recursively from the project root using ripgrep (rg).
+
+Returns matching lines along with their file paths and line numbers.
+Use the results to understand code structure, trace references, and identify
+where specific functionality is implemented.
+
+Use this tool when you need to find existing implementations or understand
+how different parts of the codebase are connected.
+
+If no matches are found, the result will indicate that no matching content
+exists. Search errors will be reported separately.
+"""
 
 
 class SearchCodeTool(BaseTool):
@@ -91,7 +109,7 @@ class SearchCodeTool(BaseTool):
                 error=f"Search failed: {error}" if error else "Search failed",
                 duration_ms=(time.perf_counter() - start) * 1000,
             )
-        parser_result = []
+        parser_result: list[dict] = []
         for res in results:
             file_path, line, column, file_content = res.split(":", 3)
             parser_result.append(

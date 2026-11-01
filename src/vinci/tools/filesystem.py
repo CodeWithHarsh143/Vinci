@@ -7,7 +7,26 @@ from vinci.schemas.toolsSchema import ReadFileArgs
 from pathlib import Path
 
 READFILE_NAME = "read_file"
-READFILE_DESCRIPTION = "Reads a file from the repository and returns its content"
+
+READFILE_DESCRIPTION = """
+Read a file from the repository and return its contents.
+
+Use this tool when you need to:
+- Understand how a particular function, class, or module is implemented.
+- Inspect existing code before modifying or extending it.
+- Understand imports, dependencies, and interactions within a file.
+- Examine configuration files, documentation, or project structure.
+
+Provide the relative path of the file to read.
+
+The tool returns the file content as text. Large files may be returned
+in chunks, so use the provided offset or continuation mechanism to
+read the remaining content if needed.
+
+Use SearchCodeTool first when you don't know which file contains
+the implementation you're looking for.
+"""
+
 READFILE_MAX_SIZE = 1024 * 1024
 
 
