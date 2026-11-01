@@ -1,4 +1,4 @@
-import time
+\import time
 import aiofiles
 from pydantic import ValidationError
 
@@ -26,10 +26,7 @@ read the remaining content if needed.
 Use SearchCodeTool first when you don't know which file contains
 the implementation you're looking for.
 """
-
 READFILE_MAX_SIZE = 1024 * 1024
-
-
 class ReadFileTool(BaseTool):
     def __init__(self, allowed_root: Path, max_size: int = READFILE_MAX_SIZE):
         super().__init__(
@@ -64,7 +61,7 @@ class ReadFileTool(BaseTool):
                             duration_ms=(time.perf_counter() - start) * 1000,
                         )
                     chunks.append(chunk)
-            file_content = "".join(chunks)
+            file_content = "\n".join(chunks)
             end = time.perf_counter()
             return ToolResult(
                 success=True,
