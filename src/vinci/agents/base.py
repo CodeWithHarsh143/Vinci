@@ -11,7 +11,7 @@ import queue
 import threading
 import logging
 import uuid
-
+from vinci.rag.retriever import Retriever
 from vinci.agents import context
 
 # -------------------------------------------------------------------------------------
@@ -31,6 +31,7 @@ _vinci_logger.addHandler(file_handler)
 
 # -----------------------------------------Constants------------------------------------
 MAX_RESULT_CHAR: int = 5000
+BASEDIR: str = "."
 
 
 @dataclass
@@ -65,6 +66,7 @@ class Agent:
         self.result_queue = queue.Queue()
         self._cancel_event = threading.Event()
         self._thread = None
+        self.retriever = Retriever(base_dir=BASEDIR)
 
     # ------------------------------------------------------------------
     # Helper / utility methods (unchanged from the single‑threaded version)
@@ -100,10 +102,19 @@ class Agent:
         """Iterate until a final answer, cancellation or a timeout."""
         start = time.perf_counter()
         messages: list = [{"role": "user", "content": task}]
-
         iterations: int = 0
         tool_calls: int = 0
-
+        if task.startswith("@search"):
+            query: str = task[len("@search") :].strip()
+            result: AgentResult = await self.run_rag(query=query)
+            if result.success:
+                _vinci_logger.info(
+                    "rag successfully give answer",
+                    extra={"run_id": self.context.state["run_id"]},
+                )
+                self.context.state["final_answer"] = result.final_answer
+                self.context.state["error"] = None
+                return
         while iterations < self.max_iterations:
             # ------------------- cancellation check -----------------
             # .wait(0.5) blocks up to 0.5 s; we then explicitly test the flag.
@@ -228,6 +239,36 @@ class Agent:
     # ------------------------------------------------------------------
     def _call_loop(self, task: str) -> None:
         asyncio.run(self._loop(task))
+
+    async def run_rag(self, query: str) -> AgentResult:
+        """Convenience method: retrieve + answer in one call."""
+        self._cancel_event.wait(0.5)
+        if self._cancel_event.is_set():
+            _vinci_logger.info(
+                "run cancelled",
+                extra={"run_id": self.context.state["run_id"]},
+            )
+            self.context.state["error"] = "cancel"
+            return AgentResult(
+                success=False, total_iterations=0, total_tool_calls=0, error="cancelled"
+            )
+        snippets: list[dict] = await self.retriever._query(query)
+        prompt = f"User query: {query}\n\nRetrieved snippets:\n"
+        for s in snippets:
+            prompt += f"- {s['path']} (excerpt): {s['excerpt']}\n"
+        prompt += "Answer the user's question based *only* on the snippets above."
+
+        # run a single‑iteration loop that just calls the LLM
+        response = await self.llm.call(
+            [{"role": "user", "content": prompt}],
+            self.registry.list_schemas(),
+        )
+        return AgentResult(
+            success=len(response.tool_calls) == 0,
+            final_answer=response.content,
+            total_iterations=1,
+            total_tool_calls=0,
+        )
 
     # ------------------------------------------------------------------
     # Public API
