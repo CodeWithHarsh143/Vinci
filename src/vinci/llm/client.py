@@ -8,7 +8,6 @@ from pydantic import BaseModel, ValidationError
 from vinci.agents.context import RunContext
 from vinci.config import settings
 from vinci.core.exceptions import LLMAPIError
-from vinci.agents.context import RunContext
 
 
 client = AsyncOpenAI(
