@@ -30,7 +30,7 @@ class Retriever:
 
         return {"path": path, "excerpt": "", "score": 0.0}
 
-    async def _query(
+    async def query(
         self,
         query: str = "",
     ) -> list[dict]:
