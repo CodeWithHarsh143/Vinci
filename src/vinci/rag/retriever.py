@@ -16,6 +16,12 @@ class Retriever:
         )
         self.search_tool = SearchCodeTool(allowed_root=Path(self.base_dir))
 
+    def _score(self, query: str, snippet: dict) -> int:
+        tokens: set = set(query.lower().split())
+        excerpt: str = snippet.get("excerpt", "").lower()
+        # intersection of query words(elements) and snippet
+        return len((tokens & set(excerpt.split())))
+
     async def read_snippet(
         self, path: str, start_line: int = 0, line_count: int = SNIPPET_MAX_LINES
     ) -> dict:
@@ -63,6 +69,8 @@ class Retriever:
                         if len(results) >= MAX_SNIPPETS:
                             break
 
+        for s in results:
+            s["score"] = self._score(query=query, snippet=s)
         # sort by score (simple: higher score first) and truncate
         results.sort(key=lambda d: d["score"], reverse=True)
         return results[:MAX_SNIPPETS]
