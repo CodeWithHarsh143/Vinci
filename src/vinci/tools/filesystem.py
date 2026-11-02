@@ -1,4 +1,4 @@
-\import time
+import time
 import aiofiles
 from pydantic import ValidationError
 
@@ -27,6 +27,8 @@ Use SearchCodeTool first when you don't know which file contains
 the implementation you're looking for.
 """
 READFILE_MAX_SIZE = 1024 * 1024
+
+
 class ReadFileTool(BaseTool):
     def __init__(self, allowed_root: Path, max_size: int = READFILE_MAX_SIZE):
         super().__init__(

@@ -104,8 +104,8 @@ class Agent:
         messages: list = [{"role": "user", "content": task}]
         iterations: int = 0
         tool_calls: int = 0
-        if task.startswith("@search"):
-            query: str = task[len("@search") :].strip()
+        if task.startswith("@search:"):
+            query: str = task[len("@search:") :].strip()
             result: AgentResult = await self.run_rag(query=query)
             if result.success:
                 _vinci_logger.info(
@@ -252,7 +252,7 @@ class Agent:
             return AgentResult(
                 success=False, total_iterations=0, total_tool_calls=0, error="cancelled"
             )
-        snippets: list[dict] = await self.retriever._query(query)
+        snippets: list[dict] = await self.retriever.query(query)
         prompt = f"User query: {query}\n\nRetrieved snippets:\n"
         for s in snippets:
             prompt += f"- {s['path']} (excerpt): {s['excerpt']}\n"
