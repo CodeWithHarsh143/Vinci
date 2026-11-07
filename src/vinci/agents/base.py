@@ -254,6 +254,17 @@ class Agent:
                 success=False, total_iterations=0, total_tool_calls=0, error="cancelled"
             )
         snippets: list[dict] = await self.retriever.query(query)
+        if len(snippets) == 0:
+            _vinci_logger.info(
+                "run cancelled", extra={"run_id": self.context.state["run_id"]}
+            )
+            self.context.state["error"] = "no snippets generated"
+            return AgentResult(
+                success=False,
+                total_iterations=0,
+                total_tool_calls=0,
+                error="no snippets obtained",
+            )
         # sort again just in case (the method already sorts, but keep it safe)
         snippets.sort(key=lambda s: s.get("score", 0), reverse=True)
         prompt = f"User query: {query}\n\nRetrieved snippets:\n"

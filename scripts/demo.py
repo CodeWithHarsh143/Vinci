@@ -30,6 +30,7 @@ async def main() -> int:
 
     llm = LLMClient(model=MODEL)
     print(f"model:          {MODEL}")
+    # registring the tool to the registry
     registry = ToolsRegistry()
     registry.register(ReadFileTool(SANDBOX))
     registry.register(SearchCodeTool(SANDBOX))
