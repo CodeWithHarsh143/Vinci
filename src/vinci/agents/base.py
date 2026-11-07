@@ -103,6 +103,77 @@ class Agent:
         """Return the last *n* turns (default: all)."""
         return self.context.history[-n:] if n else self.context.history
 
+    # ------------------------------------------------------------------
+    #  Persistence helpers
+    # ------------------------------------------------------------------
+    def save_state(self, path: str | None = None) -> str | None:
+        """Persist the agent’s memory and conversation history to a JSON file.
+
+        Parameters
+        ----------
+        path : str | None (or Name of the file)
+            Optional file path. If None a file named ``agent_memory_<run_id>.json``
+            is created in the current working directory.
+
+        Returns
+        -------
+        str | None
+            The path to the saved JSON file, or ``None`` if the agent thread hasn’t
+            been started yet.
+        """
+        if self._thread is None:
+            return None
+
+        if path is None:
+            path = f"agent_memory_{self.context.run_id}.json"
+
+        data: dict = {
+            "run_id": self.context.run_id,
+            "memory": dict(self.context.memory),
+            "history": self.context.history,
+        }
+
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception:
+            return None
+
+        return path
+
+    def load_state(self, path: str) -> bool:
+        """Load a previously saved state from a JSON file produced by ``save_state``.
+
+        Parameters
+        ----------
+        path : str
+            Path to the JSON file previously created by ``save_state``.
+
+        Returns
+        -------
+        bool
+            ``True`` if the state was loaded successfully, ``False`` on failure.
+        """
+        if path is None:
+            return False
+
+        try:
+            data: dict = {}
+            with open(path, "r") as f:
+                data = json.load(f)
+            self.context.memory = data.get("memory", {})
+            self.context.history = data.get("history", [])
+
+            return True
+        except Exception:
+            return False
+
+        return False
+
+    # -------------------------------------------------------------------------
+    # Formatter
+    # -------------------------------------------------------------------------
+
     def assistant_formatted_tool_call(
         self, tool_calls: list[ToolCallRequest]
     ) -> list[dict]:
@@ -124,6 +195,7 @@ class Agent:
         return formatted_calls
 
     # ------------------------------------------------------------------
+    # Main Thread loop (Agent loop)
     # ------------------------------------------------------------------
     async def _loop(self, task: str) -> None:
         """Iterate until a final answer, cancellation or a timeout."""
@@ -336,6 +408,7 @@ class Agent:
         """Block until the internal worker thread finishes."""
         if self._thread is not None:
             self._thread.join()
+            self.save_state()
 
     def cancel(self) -> None:
         """Ask the running loop to stop at its next safe point."""
