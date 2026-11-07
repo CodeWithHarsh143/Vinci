@@ -129,6 +129,7 @@ class Agent:
         """Iterate until a final answer, cancellation or a timeout."""
         start = time.perf_counter()
         messages: list = [{"role": "user", "content": task}]
+        self.context.history.append({"role": "user", "content": task})
         iterations: int = 0
         tool_calls: int = 0
         if task.startswith("@search:"):
@@ -206,7 +207,15 @@ class Agent:
                     ),
                 }
             )
-
+            self.context.history.append(
+                {
+                    "role": "assistant",
+                    "content": response.content,
+                    "tool_calls": self.assistant_formatted_tool_call(
+                        response.tool_calls
+                    ),
+                }
+            )
             # ------------------- execute each tool -----------------
             for tool in response.tool_calls:
                 result = await self.registry.execute(
@@ -220,6 +229,14 @@ class Agent:
                     extra={"run_id": self.context.state["run_id"]},
                 )
                 messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool.id,
+                        "name": tool.name,
+                        "content": content,
+                    }
+                )
+                self.context.history.append(
                     {
                         "role": "tool",
                         "tool_call_id": tool.id,
@@ -299,10 +316,12 @@ class Agent:
         prompt += "Answer the user's question based *only* on the snippets above."
 
         # run a single‑iteration loop that just calls the LLM
+        self.context.history.append({"role": "user", "content": prompt})
         response = await self.llm.call(
             [{"role": "user", "content": prompt}],
             self.registry.list_schemas(),
         )
+        self.context.history.append({"role": "assistant", "content": response.content})
         return AgentResult(
             success=len(response.tool_calls) == 0,
             final_answer=response.content,
