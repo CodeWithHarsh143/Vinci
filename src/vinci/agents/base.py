@@ -7,6 +7,7 @@ from vinci.llm.client import LLMClient, CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 from vinci.tools.registry import ToolsRegistry
 from .context import RunContext
+from vinci.config import settings
 import queue
 import threading
 import logging
@@ -54,9 +55,9 @@ class Agent:
     ) -> None:
         # ---- configuration from environment (if not supplied explicitly) -----
         if max_iterations is None:
-            max_iterations = int(os.getenv("VINCI_MAX_ITERATIONS", "30"))
+            max_iterations = settings.max_iterations
         if time_limit is None:
-            time_limit = float(os.getenv("VINCI_TIME_LIMIT", "600"))
+            time_limit = settings.time_limit
 
         self.llm = llm
         self.registry = registry
