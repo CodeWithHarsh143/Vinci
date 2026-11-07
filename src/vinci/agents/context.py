@@ -1,8 +1,8 @@
 from __future__ import annotations
 import threading
+from typing import Any
 import uuid
-from dataclasses import dataclass
-from typing import Dict, Any, Optional
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -14,10 +14,13 @@ class RunContext:
     """
 
     run_id: str = ""  # filled automatically by __post_init__
-    cv = threading.Condition()
+    cv = None
     deadline: float | None = None  # None → no hard time limit
-    state: Dict[str, Any] = None  # mutable dictionary – the "blackboard"
+    state: dict[str, Any] = None  # mutable dictionary – the "blackboard"
+    memory: dict[str, Any] = field(default_factory=dict)
+    history: list[dict] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.run_id = str(uuid.uuid4()) if not self.run_id else self.run_id
         self.state = {} if self.state is None else self.state
+        self.cv = threading.Condition()

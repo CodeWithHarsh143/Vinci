@@ -1,8 +1,11 @@
 import asyncio
+from typing import Any
 import os
 from dataclasses import dataclass
 import json
 import time
+
+from pydantic_core.core_schema import literal_schema
 from vinci.llm.client import LLMClient, CallResponse, ToolCallRequest
 from vinci.tools.base import ToolResult
 from vinci.tools.registry import ToolsRegistry
@@ -76,6 +79,29 @@ class Agent:
         if result.success is True:
             return json.dumps({"content": result.data})
         return json.dumps({"content": {"error": result.error}})
+
+    # ------------------------------------------------------------------
+    # Memory helpers (add after __init__; keep the existing methods intact)
+    # ------------------------------------------------------------------
+    def remember(self, key: str, value: Any) -> None:
+        """Store a value in the agent’s session memory."""
+        self.context.memory[key] = value
+
+    def recall(self, key: str, default: Any = None) -> Any:
+        """Retrieve a value from the agent’s session memory."""
+        return self.context.memory.get(key, default)
+
+    def forget(self, key: str) -> None:
+        """Remove a single key from the agent’s memory."""
+        self.context.memory.pop(key, None)
+
+    def remember_history(self, role: str, content: str) -> None:
+        """Append a turn to the conversation history."""
+        self.context.history.append({"role": role, "content": content})
+
+    def get_history(self, n: int | None = None) -> list[dict]:
+        """Return the last *n* turns (default: all)."""
+        return self.context.history[-n:] if n else self.context.history
 
     def assistant_formatted_tool_call(
         self, tool_calls: list[ToolCallRequest]
