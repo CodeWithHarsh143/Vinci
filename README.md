@@ -4,7 +4,7 @@ An AI engineering platform built progressively, version by version. Each version
 
 ---
 
-## Foundation — Complete  (M0–M3)
+## Foundation — Complete
 
 Agent foundation: LLM reasoning connected to real tool execution, proven end-to-end (user → agent → real tools → real LLM → answer) with 45 passing tests.
 
@@ -55,7 +55,7 @@ The runtime is solid, but advanced AI capabilities (retrieval‑augmented genera
 
 ### Build Checklist
 
-- [ ] RAG pipeline (retriever → reranker → answer generation)
+- [x] RAG pipeline (retriever → reranker → answer generation)
 - [ ] Code review subsystem (automated static analysis + LLM findings)
 - [ ] Memory management (persistent context, summarisation)
 - [ ] Evaluation harness (reward models, success rate, failure modes)
