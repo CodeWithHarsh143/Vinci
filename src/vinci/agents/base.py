@@ -408,7 +408,6 @@ class Agent:
         """Block until the internal worker thread finishes."""
         if self._thread is not None:
             self._thread.join()
-            self.save_state()
 
     def cancel(self) -> None:
         """Ask the running loop to stop at its next safe point."""
