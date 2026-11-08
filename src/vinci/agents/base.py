@@ -161,6 +161,9 @@ class Agent:
             data: dict = {}
             with open(path, "r") as f:
                 data = json.load(f)
+            # Clear existing state first, then restore from file.
+            # This ensures that after loading, the agent's memory/history
+            # reflect only what was saved (see test_save_state_basic).
             self.context.memory = data.get("memory", {})
             self.context.history = data.get("history", [])
 
