@@ -361,6 +361,9 @@ class Agent:
 
     async def run_rag(self, query: str) -> AgentResult:
         """Convenience method: retrieve + answer in one call."""
+        # Ensure run_id is in state (set during agent.run(); may be missing if called directly)
+        self.context.state.setdefault("run_id", self.context.run_id)
+
         self._cancel_event.wait(0.5)
         if self._cancel_event.is_set():
             _vinci_logger.info(
@@ -371,7 +374,12 @@ class Agent:
             return AgentResult(
                 success=False, total_iterations=0, total_tool_calls=0, error="cancelled"
             )
-        snippets: list[dict] = await self.retriever.query(query)
+        # Call retriever.query – handle both sync and async retrievers.
+        snippets_raw = self.retriever.query(query)
+        if asyncio.iscoroutine(snippets_raw):
+            snippets = await snippets_raw
+        else:
+            snippets = snippets_raw
         if len(snippets) == 0:
             _vinci_logger.info(
                 "run cancelled", extra={"run_id": self.context.state["run_id"]}
