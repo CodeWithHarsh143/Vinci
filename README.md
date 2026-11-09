@@ -47,7 +47,7 @@ An agent that fails predictably, shuts down cleanly, and explains what happened 
 
 ---
 
-## V0.2 — Advanced AI Engineering (next)
+## V0.2 — Advanced AI Engineering (current)
 
 ### Why this version?
 
