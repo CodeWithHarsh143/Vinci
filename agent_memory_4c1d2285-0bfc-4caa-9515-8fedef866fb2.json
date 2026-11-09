@@ -1,0 +1,20 @@
+{
+  "run_id": "4c1d2285-0bfc-4caa-9515-8fedef866fb2",
+  "memory": {
+    "custom_key": "custom_value"
+  },
+  "history": [
+    {
+      "role": "user",
+      "content": "Do something"
+    },
+    {
+      "role": "user",
+      "content": "test query"
+    },
+    {
+      "role": "assistant",
+      "content": "test answer"
+    }
+  ]
+}
