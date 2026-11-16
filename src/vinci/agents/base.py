@@ -210,14 +210,14 @@ class Agent:
         if task.startswith("@search:"):
             query: str = task[len("@search:") :].strip()
             result: AgentResult = await self.run_rag(query=query)
-            if result.success:
-                _vinci_logger.info(
-                    "rag successfully give answer",
-                    extra={"run_id": self.context.state["run_id"]},
-                )
-                self.context.state["final_answer"] = result.final_answer
-                self.context.state["error"] = None
-                return
+            _vinci_logger.info(
+                "rag successfully give answer" if result.success else "rag failed",
+                extra={"run_id": self.context.state["run_id"]},
+            )
+            # Queue the RAG result directly. Returning without enqueueing would
+            # leave callers using run/join/result_queue waiting forever.
+            self.result_queue.put(result)
+            return
         while iterations < self.max_iterations:
             # ------------------- cancellation check -----------------
             # .wait(0.5) blocks up to 0.5 s; we then explicitly test the flag.

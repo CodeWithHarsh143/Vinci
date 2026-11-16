@@ -47,7 +47,7 @@ An agent that fails predictably, shuts down cleanly, and explains what happened 
 
 ---
 
-## V0.2 — Advanced AI Engineering (current)
+## V0.2 — Advanced AI Engineering (next)
 
 ### Why this version?
 
@@ -57,7 +57,7 @@ Roadmap: `roadmap.txt` · Design: `docs/design/v0.2-provider-abstraction.md`
 
 ### Build Checklist
 
-- [ ] Provider abstraction (`LLMProvider` protocol, error taxonomy)
+- [ ] Provider abstraction (`LLMProvider` protocol, error taxonomy) (current)
 - [ ] Multiple LLM providers (Gemini, OpenAI, Fake for tests)
 - [ ] Model selection (model catalog: context window, pricing, capabilities)
 - [x] Structured outputs (Pydantic validation + retry — landed early in the foundation)
@@ -94,5 +94,3 @@ See `roadmap.txt` for the full plan and detailed acceptance criteria.
 - **V0.8 — Event-Driven Architecture**: pub/sub, event persistence, replay, consumer groups
 - **V0.9 — Production Infrastructure**: FastAPI, PostgreSQL, Redis, JWT auth, rate limiting, Docker, deployment
 - **V1.0 — Production Vinci**: complete platform with documentation, tests, and reproducible deployment
-
-A fully‑featured AI engineering platform where RAG and code review are built on top of a stable, configurable agent core, with measurable quality and performance guarantees.
