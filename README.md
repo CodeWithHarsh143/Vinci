@@ -57,7 +57,7 @@ Roadmap: `roadmap.txt` · Design: `docs/design/v0.2-provider-abstraction.md`
 
 ### Build Checklist
 
-- [ ] Provider abstraction (`LLMProvider` protocol, error taxonomy)
+- [ ] Provider abstraction (`LLMProvider` protocol, error taxonomy) (current)
 - [ ] Multiple LLM providers (Gemini, OpenAI, Fake for tests)
 - [ ] Model selection (model catalog: context window, pricing, capabilities)
 - [x] Structured outputs (Pydantic validation + retry — landed early in the foundation)
