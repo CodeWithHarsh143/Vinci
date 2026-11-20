@@ -4,7 +4,7 @@ An AI engineering platform built progressively, version by version. Each version
 
 ---
 
-## Foundation — Complete  (M0–M3)
+## Foundation — Complete
 
 Agent foundation: LLM reasoning connected to real tool execution, proven end-to-end (user → agent → real tools → real LLM → answer) with 54 passing tests.
 
@@ -57,7 +57,7 @@ Roadmap: `roadmap.txt` · Design: `docs/design/v0.2-provider-abstraction.md`
 
 ### Build Checklist
 
-- [ ] Provider abstraction (`LLMProvider` protocol, error taxonomy)
+- [ ] Provider abstraction (`LLMProvider` protocol, error taxonomy) (current)
 - [ ] Multiple LLM providers (Gemini, OpenAI, Fake for tests)
 - [ ] Model selection (model catalog: context window, pricing, capabilities)
 - [x] Structured outputs (Pydantic validation + retry — landed early in the foundation)
