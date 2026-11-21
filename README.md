@@ -90,7 +90,7 @@ See `roadmap.txt` for the full plan and detailed acceptance criteria.
 - **V0.4 — Code Intelligence**: repository indexing, semantic code retrieval, multi-file context, code review agent
 - **V0.5 — Evaluation & Observability**: execution traces, token/cost/latency metrics, agent and RAG evaluation
 - **V0.6 — Persistent Task Execution**: PostgreSQL-backed tasks, retries, idempotency, crash recovery
-- **V0.7 — Distributed Task Processing**: worker processes, acknowledgment, visibility timeouts, dead-letter queue, horizontal scaling
-- **V0.8 — Event-Driven Architecture**: pub/sub, event persistence, replay, consumer groups
+- **V0.7 — Distributed Task Processing (Vinci Queue)**: worker processes, acknowledgment, visibility timeouts, dead-letter queue, horizontal scaling
+- **V0.8 — Event-Driven Architecture (StreamForge)**: pub/sub, event persistence, replay, consumer groups
 - **V0.9 — Production Infrastructure**: FastAPI, PostgreSQL, Redis, JWT auth, rate limiting, Docker, deployment
 - **V1.0 — Production Vinci**: complete platform with documentation, tests, and reproducible deployment
